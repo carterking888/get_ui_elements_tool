@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="Mwf1Y0sgB7N2mhZmDChPsB">
+<head data-page-node-id="FIGhblUJNgUb1BvCJYkqVY">
+  <meta charset="UTF-8" data-page-node-id="JuIPzSsvbTzF3eb7q1kISD">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="Gmt5w3dvkgxZhz4YGOrOKm">
+  <title>元素定位拾取器</title>
+  <link rel="stylesheet" href="vendor/layui/css/layui.css" data-page-node-id="DelLRD9SzGhtUXMdwcDlIE">
+  <link rel="stylesheet" href="css/app.css" data-page-node-id="7fOUE0ROXkmQpMqxTb31Ai">
+</head>
+<body @vue:mounted="init()" data-page-node-id="Ti1BIVGfGyqRqeHcUSYIOR">
+<div id="app" v-cloak data-page-node-id="umXUgqj10FjcTaSHPsbvCx">
+
+  <!-- ===== 顶栏 ===== -->
+  <header class="topbar" data-page-node-id="xdCUfvVusJaRS9jJw4ptHU">
+    <div class="topbar__brand" data-page-node-id="8c3dIh9rXLFX2NbuAOKbmW">
+      <span class="brand-dot" data-page-node-id="C5TMAxN8m0N1z2m0gcxMO9"></span>
+      <span class="brand-name" data-page-node-id="Dz3XbXakr0qUzXtRxPNtE1">ElementPicker 元素定位拾取器</span>
+      <span class="brand-ver" v-text="appVersion" data-page-node-id="r8J1aJYRGMzWiu3AKZ6wco">v1.0.0</span>
+    </div>
+    <nav class="topbar__nav" data-page-node-id="5GzVG08X03RxCRwxVSZ58A">
+      <button v-for="t in tabs" :key="t.key" class="nav-pill" :class="route===t.key ? 'is-active' : ''"
+              @click="go(t.key)" v-text="t.label" data-page-node-id="4KHdrF79nM7G6lOz477raO"></button>
+    </nav>
+    <div class="topbar__right" data-page-node-id="szgmkcG41TSD0gwMDi2fte">
+      <span class="live-chip" :class="bStatus.running ? 'is-on' : ''" data-page-node-id="U6gHxeJLLcSJfbxT5DQWRn">
+        <i class="dot" data-page-node-id="j2eUmIxx1KH0XjeewJEuXn"></i>
+        <span v-text="bStatus.running ? (bStatus.engine + ' · 已连接') : '未连接'" data-page-node-id="NWBQsNJQ4d58xwTExp1G9x"></span>
+      </span>
+      <button class="theme-toggle" :title="theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'"
+              @click="toggleTheme()" v-text="themeIcon"></button>
+    </div>
+  </header>
+
+  <div class="toast" v-if="toast && toast!=='ready'" :class="toastCls" v-text="toast" data-page-node-id="qquKcoAZhu9ZdpgUXGiBoj"></div>
+
+  <main class="main" data-page-node-id="R90f7Q0BQjgEEz8BHXHIKl">
+
+    <!-- ===== 1. 启动输入 ===== -->
+    <section class="page page-launch" v-show="route==='launch'" data-page-node-id="UPHbmnyRKMzrgxBYZDPCKs">
+      <div class="launch-grid" data-page-node-id="EwlxBeDFQzwDIzs364hOzG">
+        <div class="launch-main" data-page-node-id="DYcfrJnk7in0RvRsVlgpAw">
+          <div class="card hero-card" data-page-node-id="TxQw9S1NC4NGwE9yImRnGQ">
+            <div class="step-tag" data-page-node-id="3FiFdzLEq4pgZcSW5CQoSa">STEP 01 · 连接目标页面</div>
+            <h1 data-page-node-id="L6s2EwSzhmvhEB2DQSutvN">输入页面地址，开始拾取元素定位符</h1>
+            <p class="hero-desc" data-page-node-id="56AK5NP2SkJHzoiIREBOnW">浏览器将在独立窗口加载目标页面，点击页面任意元素即可提取 XPath、CSS 选择器、Id 与 name 等定位信息。</p>
+            <div class="url-row" data-page-node-id="58L79GKQILGTyar5nLCBwH">
+              <div class="url-input" data-page-node-id="sySgKFTe7gUFcJC49kALur">
+                <i class="layui-icon layui-icon-link" data-page-node-id="UEtnwJ9jL0xnCncXyqB5OO"></i>
+                <input type="text" v-model="urlInput" placeholder="https://shop.example.com/products/list?page=2"
+                       @keyup.enter="openBrowser()" data-page-node-id="edKLZHPEXsBzyft7u8pM6m">
+                <button class="clear-btn" v-if="urlInput" @click="urlInput=''" data-page-node-id="8FJlsEGUshl6TQdDS3wAYy">×</button>
+              </div>
+              <button class="btn btn-primary" :class="busy ? 'is-busy' : ''" @click="openBrowser()" data-page-node-id="ABHvDhkXZFpH3NktgieRZ3">
+                <span v-text="busy ? '启动中…' : '▶ 打开浏览器'" data-page-node-id="2xoK2pyR6cSpuJATYb7i9Q"></span>
+              </button>
+            </div>
+            <div class="engine-row" data-page-node-id="zrvyYo1ekq758EDn00g4QI">
+              <span class="engine-label" data-page-node-id="nw1AirYjG4ERcsEpTinmZf">拾取引擎</span>
+              <button class="engine-pill" :class="engine==='playwright' ? 'is-active' : ''" @click="engine='playwright'" data-page-node-id="gr0UHqhW3WIMToQzHZzrJz">Playwright</button>
+              <button class="engine-pill" :class="engine==='selenium' ? 'is-active' : ''" @click="engine='selenium'" data-page-node-id="kLGH6i2H8UkMDAoSFXAqUB">Selenium</button>
+              <span class="engine-hint" data-page-node-id="0nOvBaRhj5mwhxIPTyHo8x">引擎负责驱动浏览器与注入拾取脚本；Playwright 在无系统浏览器时会自动下载 Chromium（约150MB，联网一次）</span>
+            </div>
+            <div class="engine-row">
+              <span class="engine-label">浏览器</span>
+              <button class="engine-pill" :class="browserChoice==='edge' ? 'is-active' : ''" @click="setBrowser('edge')">Edge（默认）</button>
+              <button class="engine-pill" :class="browserChoice==='chrome' ? 'is-active' : ''" @click="setBrowser('chrome')">Chrome</button>
+              <span class="engine-hint">未安装所选浏览器时自动回退另一个，选择会记住</span>
+            </div>
+            <div class="quick-row" data-page-node-id="HHSIeXuBUJQLp2TGDDLQkU">
+              <span class="quick-label" data-page-node-id="l1LJYH7QqUJ2eRTzC6HOxr">快捷访问</span>
+              <span class="quick-slot" v-for="(q,qi) in quickLinks" :key="qi">
+                <span v-if="quickEditing" class="quick-edit">
+                  <input class="qe-input qe-label" type="text" :value="q.label" @input="q.label=$event.target.value" @change="persistQuickNow()" placeholder="名称">
+                  <input class="qe-input" type="text" :value="q.url" @input="q.url=$event.target.value" @change="persistQuickNow()" @keyup.enter="toggleQuickEdit()" placeholder="http://...">
+                  <button class="qe-del" @click="delQuick(q)" title="删除该项">×</button>
+                </span>
+                <button v-else class="quick-chip" @click="urlInput=q.url" v-text="q.label" data-page-node-id="ZDDB7CisI5sotUk7d8TIPr"></button>
+              </span>
+              <button v-if="quickEditing" class="quick-chip" @click="addQuick()">＋ 添加</button>
+              <button class="quick-chip is-edit" :class="quickEditing ? 'is-on' : ''" @click="toggleQuickEdit()" v-text="quickEditing ? '✓ 完成' : '✎ 编辑'"></button>
+            </div>
+          </div>
+
+          <div class="card recent-card" data-page-node-id="yc9n5i8wvxxnC04iB1yQr8">
+            <div class="card-head" data-page-node-id="5hJtDAUAmzuG8movLSg1f9">
+              <span class="card-title" data-page-node-id="OXSFniRmI7KCtPDjKPGhIp">最近访问</span>
+              <span class="card-sub" v-text="recent.length ? recent.length + ' 条记录 · 点击可再次打开页面' : ''" data-page-node-id="wRCDNFoG7HvdlRTFgHAssT"></span>
+            </div>
+            <div class="recent-empty" v-if="!recent.length" data-page-node-id="puEof9bwGKNLKsC4kcs69Z">暂无访问记录，输入上方地址开始第一次拾取</div>
+            <div class="recent-item" v-for="r in recent" :key="r.url" @click="urlInput=r.url" data-page-node-id="vDNkJHDjEslof3skvhbduJ">
+              <span class="rec-dot" data-page-node-id="7l8xJ2QWI1L6urCRsH79zQ"></span>
+              <span class="rec-url" v-text="r.short" data-page-node-id="3MkS1OHnKAtskQ7A7bMzou"></span>
+              <span class="rec-meta" v-text="r.label" data-page-node-id="ocH2MWs5KpubEsXFSu04X0"></span>
+              <span class="rec-env" v-text="r.env" data-page-node-id="SOrqGxl5QGbVD9wCerWWwM"></span>
+            </div>
+          </div>
+
+          <div class="stat-row" data-page-node-id="nWkOgQNwlebgoo0vEVRnm8">
+            <div class="stat-card" data-page-node-id="n1NuoEPDUkNiQdrTorL0fC">
+              <div class="stat-label" data-page-node-id="GEDy9RJQ6kj03RIN5HoZer">元素属性</div>
+              <div class="stat-value" v-text="latest ? Object.keys(latest.raw.attrs||{}).length + ' 项' : '—'" data-page-node-id="wQJGrDvy6mwbNqJ5CMCn0O"></div>
+              <div class="stat-sub" data-page-node-id="Ht30u0UTHRACnbYcxqrzsN">id、name、class、文本、尺寸与布局</div>
+            </div>
+            <div class="stat-card" data-page-node-id="vB3VC5dnDVo8S0ZO9zO2fE">
+              <div class="stat-label" data-page-node-id="mmThQv69hXOuUnzRdWDiFY">定位方式</div>
+              <div class="stat-value is-green" v-text="latest ? '4 种' : '4 种'" data-page-node-id="hRnvL562DHj4DFCBOLZHKP"></div>
+              <div class="stat-sub" data-page-node-id="azDKkdkRFA1oyUBAIiNcsv">XPath、CSS 选择器、id、name</div>
+            </div>
+            <div class="stat-card" data-page-node-id="IOQUSaFfq7zSnkXxsSfTMW">
+              <div class="stat-label" data-page-node-id="eOoHgeQGlVjlD55JWzXP0A">拾取速度</div>
+              <div class="stat-value" v-text="pollMs + ' ms'" data-page-node-id="MLyAhFHebMwzpK5jAz6rm6"></div>
+              <div class="stat-sub" data-page-node-id="4bJbzHkZOO0pFpyaWu7Lwd">从点击到拾取输出定位符</div>
+            </div>
+            <div class="stat-card" data-page-node-id="BOSmmtmNsJpGJVJYW52yGA">
+              <div class="stat-label" data-page-node-id="I6GVnVdQkukQSeYCjhcXJM">唯一率</div>
+              <div class="stat-value" v-text="latestUniqueRate" data-page-node-id="DKOMdG0zSjq0vJ7wIMHtDb"></div>
+              <div class="stat-sub" data-page-node-id="774oVBmw9n0LGS52KkiZR9">基于页面 DOM 实时校验</div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="launch-side" data-page-node-id="PaDNJTk4EEFw1QxZztbQ4W">
+          <div class="card side-card" data-page-node-id="8EqNsbDGkncrZXiFKCUcqC">
+            <div class="card-title" data-page-node-id="IsNbeQKpSSSKnUploCsQyg">当前状态</div>
+            <div class="side-state" data-page-node-id="S4ECI53EMcnqB3sYRTDB0q">
+              <span class="side-dot" :class="bStatus.running ? 'is-on' : ''" data-page-node-id="F5jTSEy48wjDuqr7WSaOLs"></span>
+              <span v-text="bStatus.running ? '浏览器拾取中' : '等待输入页面地址'" data-page-node-id="ILhZ5Zt2dciby2zVDBAeB0"></span>
+            </div>
+            <div class="kv" data-page-node-id="wsMhiffhBE346lxk5oG0I1"><span class="k" data-page-node-id="5jiAR8rWVqumV0skEK3LnF">浏览器内核</span><span class="v" v-text="bStatus.running ? (browserChoice==='chrome' ? 'Chrome · 自动化驱动' : 'Edge · 自动化驱动') : '—'" data-page-node-id="HPXHzKGWpiDEO82VUKqFnV"></span></div>
+            <div class="kv" data-page-node-id="chfRx3zd3R73Y1ybn85LHs"><span class="k" data-page-node-id="sodi3dSmbUpN7G8mKLd8fz">拾取引擎</span><span class="v" v-text="bStatus.running ? bStatus.engine : '未建立连接'" data-page-node-id="FviQvUHoR1EHJp8c0Wx4BS"></span></div>
+            <div class="kv" data-page-node-id="IGtOLqJakiGuVpZ4JP0WFc"><span class="k" data-page-node-id="oN1bORGWJpiPEKP7vpMrYr">拾取模式</span><span class="v" data-page-node-id="7gPjizHzxYDGwmVutbAbCR">点击拾取元素</span></div>
+          </div>
+          <div class="card side-card" data-page-node-id="Mx6RaIsaFKbe1AvDJ8rDdp">
+            <div class="card-title" data-page-node-id="8vRk5HS10fSL4R6a8vlJN7">运行环境</div>
+            <div class="kv" data-page-node-id="fwxt4IS0oMkawFOBt91Jnd"><span class="k" data-page-node-id="tWwB6LzHJVyEuBHaJUPhyF">窗口</span><span class="v" data-page-node-id="S3HnczyFuYZFEjCdbTbgIz">1440 x 960</span></div>
+            <div class="kv" data-page-node-id="5yHDFKjhKDoU7ISiDa915d"><span class="k" data-page-node-id="nMshvT7T36pqGv8QT1DfRe">缩放比例</span><span class="v" data-page-node-id="dGsz8mK90M64XNj2R6Y8La">100%</span></div>
+            <div class="kv" data-page-node-id="NUePNHPbB1f6P5U3JVAdHp"><span class="k" data-page-node-id="8cbcxpv4P1gjZ3yPQ9V0jC">拾取脚本</span><span class="v" v-text="bStatus.picker ? '已注入' : '未注入'" data-page-node-id="VAzntbKYfVdqDoZD0Iclgj"></span></div>
+          </div>
+          <div class="card side-card" data-page-node-id="hFjlO3HhkHv3CuT7JZqor2">
+            <div class="card-title" data-page-node-id="UozN49M6LA5Ppfi80DR7NH">快速上手</div>
+            <div class="guide-step" data-page-node-id="UPp3b2mklSDRbQJ6s9xNnu"><i data-page-node-id="2ZMmG137jTD7GOtcLpzH64">1</i>输入目标页面地址，点击「打开浏览器」加载页面。</div>
+            <div class="guide-step" data-page-node-id="TmrW8zg5sVQE3VBLvoR606"><i data-page-node-id="SeXHQBQF86TGjXKu711B8q">2</i>在右侧窗口点击目标元素所在坐标，自动高亮该元素。</div>
+            <div class="guide-step" data-page-node-id="zEo3Dsuozd9HVSAlyCjSuI"><i data-page-node-id="DWShKdJVTPVld5MVsdSQq0">3</i>在右侧面板复制定位符，或前往「定位结果」查看详情。</div>
+            <div class="guide-tip" data-page-node-id="19Hunp8JeAnPsWIWaVldXS">提示: 按 Esc 可暂停拾取避免误点，按 Shift 恢复；拾取到的记录自动进入右侧列表。</div>
+          </div>
+          <div class="card side-card" data-page-node-id="WEnriPBnhgVuEkUKB4IuTT">
+            <div class="card-title" data-page-node-id="AxHd42FeuHkpIZyYV0iOEE">App 应用拾取</div>
+            <p class="side-note" data-page-node-id="qgCwqfuN4TuMABpG1JelCa">需要拾取 WebView2 / Electron 应用内的元素？切换到「App 拾取」页，通过 CDP 远程调试端口接管应用页面。</p>
+            <button class="btn btn-ghost btn-block" @click="go('app')" data-page-node-id="z0WSaDFqK2RyMOfqmTVAwb">前往 App 拾取 →</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ===== 2. 浏览器拾取 ===== -->
+    <section class="page page-pick" v-show="route==='pick'" data-page-node-id="OWBkhlHJWol0XNkvK4RTDO">
+      <div class="pick-bar" data-page-node-id="aG8Ch32mOLoWhDLNW1SOpg">
+        <span class="pb-chip" :class="bStatus.running ? 'is-on' : ''" v-text="bStatus.running ? '已连接' : '未连接'" data-page-node-id="i4ccQRyRVmMwvd7oxQcVgk"></span>
+        <span class="pb-url" v-text="bStatus.url || '未打开页面'" data-page-node-id="wYTw0UeK29lriC54nEL8yN"></span>
+        <button class="btn btn-sm" :class="bMode==='pick' ? 'btn-primary' : 'btn-ghost'"
+                v-if="bStatus.running" @click="toggleBMode()"
+                v-text="bMode==='pick' ? '⌖ 拾取中' : '↔ 浏览中'"></button>
+        <span class="pb-hint" v-if="bStatus.running && bMode==='pick'">点击采集 · 输入框可直接输入 · Ctrl+点击跳转(新标签页自动跟随) · Esc 暂停</span>
+        <span class="pb-hint" v-if="bStatus.running && bMode==='browse'">浏览模式: 可正常点击/输入, 点按钮切回拾取</span>
+        <button class="btn btn-ghost btn-sm" v-if="bStatus.running" @click="closeBrowser()" data-page-node-id="xga3en7kfuHjYKSoIz2Qfj">关闭浏览器</button>
+      </div>
+      <div class="pick-grid" data-page-node-id="5d3FhJo16x6ywPH0piJDHO">
+        <div class="pick-main" data-page-node-id="0zZo0R0G657PtQmn32x3mu">
+          <div class="empty-pick" v-if="!bPicks.length" data-page-node-id="r6GMCMp6uz1CLdUspIO1FS">
+            <div class="empty-icon" data-page-node-id="TZNdrKecdOcidyRPNxH9ZS">⌖</div>
+            <div class="empty-title" v-text="bStatus.running ? '等待拾取…' : '浏览器未启动'" data-page-node-id="otqaCjmM4J0HSVDDz9TOQ7"></div>
+            <div class="empty-desc" v-if="bStatus.running" data-page-node-id="q4WMi1gmGBYxilfN7AfC1u">切换到目标浏览器窗口，鼠标悬停会出现绿色高亮框，点击即完成一次拾取。</div>
+            <div class="empty-desc" v-else data-page-node-id="BSiWHIpAYUKv3RivdYi8fm">回到「启动输入」页输入地址并打开浏览器。</div>
+          </div>
+          <div class="pick-stream" v-else data-page-node-id="LbtTA4kss9FqEJ2pkTLhpg">
+            <div class="stream-head" data-page-node-id="D0IleDZtp4KPABLV9hOjEF">
+              <span class="card-title" data-page-node-id="k111lkubvuxSQiWfzojatx">拾取流</span>
+              <span class="card-sub" v-text="bPicks.length + ' 条 · 新拾取在前'" data-page-node-id="DR7CMSRJPmZnUrSotnVuHA"></span>
+              <button class="stream-clear" v-if="bPicks.length" @click="clearPicks('browser')" data-page-node-id="DR7CMSRJPmZnUrSotnVuHA2">清空</button>
+            </div>
+            <div class="pick-item" :class="bFocus===p ? 'is-sel' : ''" @click="selPick(p, 'browser')" v-for="(p,i) in bPicks" :key="p.raw.ts + '-' + i" data-page-node-id="FGK6YQSVtUxcjLQpSYdTsB">
+              <span class="pi-tag" v-text="p.tagDisp" data-page-node-id="2fHdPnSNX0qPvCsoKmPpOj"></span>
+              <span class="pi-text" v-text="p.text" data-page-node-id="czMjo9G5YYCyc14Oe9E9ES"></span>
+              <span class="pi-pos" v-text="p.pos" data-page-node-id="yhJtun00b4KycKcDjNcxER"></span>
+              <span class="pi-time" v-text="p.timeStr" data-page-node-id="HPGLb1K8NPHHBvPSTP50UC"></span>
+              <span class="pi-actions" data-page-node-id="6xRUU5MEcxE4JUdUGSItHs">
+                <button class="mini-btn" @click.stop="openResult(p)" data-page-node-id="3EbLPFCg3F3E5sZtzaMXUD">详情</button>
+                <button class="mini-btn" @click.stop="copy(p.bestCss || p.bestXpath)" data-page-node-id="mhkALhZGtnohuNPMpfqvFg">复制</button>
+                <button class="mini-btn" :class="p.saved ? 'is-done' : ''" @click.stop="saveRecord(p)" v-text="p.saved ? '已存' : '保存'" data-page-node-id="ryOogdQhSxOCKXEUaGN7nF"></button>
+                <button class="mini-btn is-danger" @click.stop="delPick(p)" data-page-node-id="ryOogdQhSxOCKXEUaGN7nF2">删除</button>
+              </span>
+            </div>
+          </div>
+        </div>
+        <aside class="pick-side" data-page-node-id="Kb6wuzHNYw41ha1P52eiVY">
+          <div class="card" data-page-node-id="cULZtXI7v0AK6y5BUABq6B">
+            <div class="card-head" data-page-node-id="VE6fSGQkWmbhqJpRTCsN5f">
+              <span class="card-title" data-page-node-id="sDxkHASfLRN3MSekfAqQit">元素定位</span>
+              <span class="live-chip is-on" v-if="bStatus.running" data-page-node-id="uUBa8L3TQGRD69zKqY9Bh1"><i class="dot" data-page-node-id="62drJ1ZFO7aV6BBzIXuDbo"></i>实时拾取</span>
+            </div>
+            <template v-if="latest" data-page-node-id="en7g9xc1d1gGltRJf3OLDv">
+              <div class="loc-hero" data-page-node-id="jE4bFvLA3XemHkOgoE0dzL">
+                <span class="loc-hero-tag" v-text="latest.tagDisp" data-page-node-id="iMi2cGBbgBirCC46lGzGGY"></span>
+                <button class="mini-btn" @click="copy(latest.tagDisp)" data-page-node-id="BD6UrqEY7s07ZMdrmOBMLm">复制</button>
+              </div>
+              <div class="kv" data-page-node-id="pTumlxUOBO8eGr817edonA"><span class="k" data-page-node-id="aSx49GDavjREF9IijFNtOz">标签名</span><span class="v mono" v-text="latest.tag" data-page-node-id="fMVnQy91xfDECJEGIaDoHF"></span></div>
+              <div class="kv" data-page-node-id="Lh8BoP7ysqkv4RYPoKXw0P"><span class="k" data-page-node-id="0RD77JQLWgmnJ0mQyz1AQC">id</span><span class="v mono" v-text="latest.idDisp" data-page-node-id="gIz9yYW1AsrLVaSMyIQvt7"></span></div>
+              <div class="kv" data-page-node-id="A7sM34NeKNeM3Q465igPpj"><span class="k" data-page-node-id="v8aOX2IFnE1P0E56ElgbGs">name</span><span class="v mono" v-text="latest.nameDisp" data-page-node-id="6sDe0KqdLD10m9ojEftaQx"></span></div>
+              <div class="kv" data-page-node-id="dyTOvGH72ncPshybviEfYf"><span class="k" data-page-node-id="0MkA3eB1vXWhkdkyEyBUpy">class</span><span class="v mono" v-text="latest.classDisp" data-page-node-id="C1gwVCHH3mdfa8TDSgHdCB"></span></div>
+              <div class="kv" data-page-node-id="6jcOZ1ImmLGgvMcMz8A2wa"><span class="k" data-page-node-id="CbIKjM7VxrajbxeaC7jJKQ">文本内容</span><span class="v" v-text="latest.text" data-page-node-id="EeYPRsTkLwtg44cZ5lkD5p"></span></div>
+              <div class="kv" data-page-node-id="1dbwMbfEBAaEyMtpAiFjYC"><span class="k" data-page-node-id="ObMmvhykylTxOrlDlcKaZR">尺寸</span><span class="v mono" v-text="latest.size" data-page-node-id="BheuWHAxpGJdBXUbjfiBL0"></span></div>
+              <div class="kv" data-page-node-id="CFcOljvvG3eWDOQAHd2GwO"><span class="k" data-page-node-id="LHniwZyYYK68nkgFbORnrh">位置</span><span class="v mono" v-text="latest.pos" data-page-node-id="h2dZFWEQnt7GqR5PrrN0BA"></span></div>
+              <div class="loc-sub" data-page-node-id="v6Cpb945nFv7MlpdaZP1iO">定位符</div>
+              <div class="loc-row" data-page-node-id="33oKbVdB3xIvOUfI1brggu">
+                <span class="loc-kind" data-page-node-id="9ClgQtX32APZ2RuLAuUw0n">XPath</span>
+                <span class="loc-badge" :class="latest.uniqueXpath ? 'is-unique' : ''" v-text="latest.uniqueXpath ? '唯一' : '待校验'" data-page-node-id="7tNmpF0GlVg1NGJhkuCzuT"></span>
+                <code class="loc-val" :class="expMap[latest.bestXpath] ? 'exp' : ''" @click="toggleExp(latest.bestXpath)" v-text="latest.bestXpath"></code>
+                <button class="mini-btn" @click="copy(latest.bestXpath)" data-page-node-id="9OMSFalARfebWNs9k0y1iZ">复制</button>
+              </div>
+              <div class="loc-row" data-page-node-id="Y5nFYTPLxE9mARKE7ApfrF">
+                <span class="loc-kind" data-page-node-id="HcSFGvKSSts6SEnAsCBiSh">CSS</span>
+                <span class="loc-badge" :class="latest.uniqueCss ? 'is-unique' : ''" v-text="latest.uniqueCss ? '唯一' : '待校验'" data-page-node-id="tN6UCE1SE8e61kgG31SuSJ"></span>
+                <code class="loc-val" :class="expMap[latest.bestCss] ? 'exp' : ''" @click="toggleExp(latest.bestCss)" v-text="latest.bestCss"></code>
+                <button class="mini-btn" @click="copy(latest.bestCss)" data-page-node-id="uAXHLyLjfCQdHjB1vEuJ9O">复制</button>
+              </div>
+              <div class="loc-row" data-page-node-id="ZHgvBCkdFJI1PPWrhDG4Mc">
+                <span class="loc-kind" data-page-node-id="AFeJIWMFsNrYM6nQK34xVv">ID</span>
+                <span class="loc-badge" :class="latest.uniqueId ? 'is-unique' : 'is-dead'" v-text="latest.uniqueId ? '唯一' : '不可用'" data-page-node-id="eVAPqbZ6Cx28EiFKejpYnV"></span>
+                <code class="loc-val" :class="expMap[latest.idDisp] ? 'exp' : ''" @click="toggleExp(latest.idDisp)" v-text="latest.idDisp"></code>
+                <button class="mini-btn" v-if="latest.idHas" @click="copy(latest.idDisp)" data-page-node-id="nK6T1Ycy7YXJqpSmGOpBgQ">复制</button>
+              </div>
+              <div class="loc-foot" v-text="'已拾取 ' + bPicks.length + ' · ' + Object.keys(latest.raw.attrs||{}).length + ' 属性'" data-page-node-id="7g1eJcM6AeFh5wRjOHrB8a"></div>
+              <button class="btn btn-ghost btn-block" @click="openResult(latest)" data-page-node-id="SSkSP7l2junt8b9TpLKjQl">查看完整定位结果 →</button>
+            </template>
+            <div class="empty-side" v-else data-page-node-id="hhWA1YTaQArDtSwhSEvyex">尚无拾取结果</div>
+          </div>
+          <div class="card" v-if="bPicks.length" data-page-node-id="foWuX1kWa5nCWOTMQciH7z">
+            <div class="card-head" data-page-node-id="iA4FtsswLxxnc3BB4P5qi0">
+              <span class="card-title" data-page-node-id="il2t650t1wrq07xebXzyLt">最近拾取</span>
+              <span class="card-sub" v-text="'共 ' + bPicks.length + ' 条'" data-page-node-id="PCB1Syt8w9Ycii0RGBkMzV"></span>
+            </div>
+            <div class="hist-item" v-for="(p,i) in bPicks.slice(0,8)" :key="'r'+i" @click="openResult(p)" data-page-node-id="qA0PDCo2xHPxsawG6LMNwI">
+              <code class="hi-ident" v-text="p.bestCss || p.bestXpath" data-page-node-id="oLYmj5FEt96jJxEd10OSi0"></code>
+              <span class="hi-time" v-text="p.timeStr" data-page-node-id="VZ9thhxgnLlTZZn5dJhD2T"></span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ===== 3. 定位结果 ===== -->
+    <section class="page page-result" v-show="route==='result'" data-page-node-id="7oPH1Uvf4aD81Hjk1KKhm6">
+      <div class="pick-bar" data-page-node-id="IRxpidXKRR3UZ90xDgKEvF">
+        <span class="pb-chip is-on" v-if="current" data-page-node-id="TIBBLHk5cZstAT3jgFnsQn">元素已锁定</span>
+        <span class="pb-url" v-text="current ? current.url : '暂无选中元素'" data-page-node-id="tirwaDB5JcuiTYGl81IXbJ"></span>
+        <button class="btn btn-ghost btn-sm" v-if="current" @click="go('pick')" data-page-node-id="eUbH0RtBB3hqHwnUcKM1wC">← 返回拾取</button>
+      </div>
+      <div class="empty-pick" v-if="!current" data-page-node-id="FtxaEiCkRqNE5Ph8lkxfPM">
+        <div class="empty-icon" data-page-node-id="kOSoat1jSzASpPLNtrXNSu">◎</div>
+        <div class="empty-title" data-page-node-id="CxPSd925FlR9AibESYxmlF">暂无定位结果</div>
+        <div class="empty-desc" data-page-node-id="WGrE7BPVsCwIHvmRoNTf0a">先在「浏览器拾取」或「App 拾取」页拾取一个元素。</div>
+      </div>
+      <div class="result-wrap" v-else data-page-node-id="2q8f1IYJx9nQOEBYko5ZUz">
+        <div class="result-row" data-page-node-id="H4Yy4FLqA0o9nWkOZ7QRTU">
+          <div class="card" data-page-node-id="COTmQHewUDEClJ2Dyaz3K3">
+            <div class="card-title" data-page-node-id="yzcbddbzuZoVJREiv80UZr">元素基本信息</div>
+            <div class="kv" data-page-node-id="DUDzGT5dDIaYCvrgzDbGGB"><span class="k" data-page-node-id="wF9zIVbqW1b6ss4xs8hbiV">标签名</span><span class="v mono" v-text="current.tag" data-page-node-id="HqmsCmEVJpbb3sg4hWTPoz"></span></div>
+            <div class="kv" data-page-node-id="m87IK9y3hlo2oDy8ngls7P"><span class="k" data-page-node-id="nJwg4ZmMJdsieCCJv6uDBZ">id</span><span class="v mono" v-text="current.idDisp" data-page-node-id="P8ofua6zNPsJ0ERBZ5wzsh"></span></div>
+            <div class="kv" data-page-node-id="h93fS8fxpZDtqDCHOPAft3"><span class="k" data-page-node-id="R26MVaIuNWKBdntaBRQ8sn">name</span><span class="v mono" v-text="current.nameDisp" data-page-node-id="MKaYswUKe4zQvCzRPO4BwH"></span></div>
+            <div class="kv" data-page-node-id="3b5RP7YODgipwCuHDdQpPY"><span class="k" data-page-node-id="lznveNX13VYQyCnaOZedCl">class</span><span class="v mono" v-text="current.classDisp" data-page-node-id="CCkSFytiv5R8HmG0wQvPQW"></span></div>
+            <div class="kv" data-page-node-id="5K1xKzFSGAQh9YJEuaRrdP"><span class="k" data-page-node-id="zaoeEZPqKK8fv3VTNsiiu1">文本内容</span><span class="v" v-text="current.text" data-page-node-id="NAosKIcT3NpNwNGiufUgNg"></span></div>
+            <div class="kv" data-page-node-id="kq3YysjfmWYotu4xDOHiRf"><span class="k" data-page-node-id="5W7G6F8HkWv1CpfGhkTfAL">尺寸与位置</span><span class="v mono" v-text="current.size + ' · ' + current.pos" data-page-node-id="fEjfXwx8RnymlAU0CBNuVi"></span></div>
+            <div class="kv" v-for="a in current.attrList" :key="a.k" data-page-node-id="gxcKfRXtl53a3He7oU1xRz"><span class="k" v-text="'@' + a.k" data-page-node-id="FVHpeO5FJungr7BOGwOaEA"></span><span class="v mono" v-text="a.v" data-page-node-id="Pturyv7INVHIeICODobgCJ"></span></div>
+          </div>
+          <div class="card" data-page-node-id="NeMAQ8BC2HWfCsD9cH4dwp">
+            <div class="card-title" data-page-node-id="Qx459soYXIPUPwgZXnJn0y">定位符唯一性检验</div>
+            <div class="hint-bar" data-page-node-id="D7jYuo8UoYrv0fhldG23Vh">XPath 与 CSS 选择器基于拾取时页面 DOM 校验，页面结构变化后可点「重新校验」实时确认。</div>
+            <div class="uniq-row" data-page-node-id="cit9At2HzXPGAT7GwrrC4j">
+              <span class="loc-kind" data-page-node-id="2VTwZevku4gVxMTub8hxg2">XPath 定位符</span>
+              <span class="loc-badge" :class="current.uniqueXpath ? 'is-unique' : 'is-multi'" v-text="current.uniqueXpath ? '唯一' : '待校验'" data-page-node-id="hM2iZAzDriIBM5MJS8FStI"></span>
+            </div>
+            <div class="uniq-row" data-page-node-id="KsayX3hMRWjUm2SCe4mhz7">
+              <span class="loc-kind" data-page-node-id="SLdcRZOVu55lB9HTH1s0vg">CSS 选择器</span>
+              <span class="loc-badge" :class="current.uniqueCss ? 'is-unique' : 'is-multi'" v-text="current.uniqueCss ? '唯一' : '待校验'" data-page-node-id="NIb5TxxOeKh2NWxVbGq2OW"></span>
+            </div>
+            <div class="uniq-row" data-page-node-id="qtR5UNWpafntyVxQbhxtId">
+              <span class="loc-kind" data-page-node-id="Yr3XgFAvVJVdLsGRBlobHB">ID 属性</span>
+              <span class="loc-badge" :class="current.uniqueId ? 'is-unique' : 'is-dead'" v-text="current.uniqueId ? '唯一' : '不可用'" data-page-node-id="ABFd5Cht7YCPWMtOqTlIOc"></span>
+            </div>
+            <div class="uniq-row" data-page-node-id="6pLAtHHjw6qnMzLUrXFpO7">
+              <span class="loc-kind" data-page-node-id="dnuns3uuwaNyfx9D9jTAT1">name 属性</span>
+              <span class="loc-badge" :class="current.nameHas ? 'is-multi' : 'is-dead'" v-text="current.nameHas ? '有值' : '该元素无 name'" data-page-node-id="6tGyNpXh3AJDqCKEvvDuk1"></span>
+            </div>
+            <button class="btn btn-primary btn-sm" @click="validateCurrent(current)" data-page-node-id="d0t7Zien5odM4zp1ZcZ39f">⟳ 重新校验</button>
+          </div>
+        </div>
+
+        <div class="card" data-page-node-id="TTQVJMAvbRbxuTCUwT2HFm">
+          <div class="card-head" data-page-node-id="4fjx9Ysz9DWzDpA74c8hwr">
+            <span class="card-title" data-page-node-id="JZuB2MKAdw6tVBtxXBEx2o">XPath 候选</span>
+            <span class="card-sub" v-text="current.xpathList.length + ' 条候选 · 按唯一性排序'" data-page-node-id="HjKe2lYFVTNOyL9lMliLL9"></span>
+          </div>
+          <div class="cand-row" v-for="(c,i) in current.xpathList" :key="'x'+i" data-page-node-id="GZCD9G6k3GF16AutUHPfQi">
+            <span class="cand-kind" v-text="c.kindLabel" data-page-node-id="tzHxjJjAkSUCQZ2I1SLLDg"></span>
+            <span class="loc-badge" :class="c.badgeCls" v-text="c.badge" data-page-node-id="iabjWL0PnGPHDFiiYM8gSF"></span>
+            <code class="loc-val" :class="expMap[c.value] ? 'exp' : ''" @click="toggleExp(c.value)" v-text="c.value"></code>
+            <button class="mini-btn" @click="copy(c.value)" data-page-node-id="xwnHqKecXCGEFGDCB3kCaH">复制</button>
+          </div>
+        </div>
+
+        <div class="result-row" data-page-node-id="9Xud9Y7HL3ylFT7Q7ybfis">
+          <div class="card" data-page-node-id="3bjSHOv1VcfBOWwZf2rkxP">
+            <div class="card-title" data-page-node-id="IbCRtXNHELfCxw53EoTuWr">CSS 选择器</div>
+            <div class="cand-row" v-for="(c,i) in current.cssList" :key="'c'+i" data-page-node-id="ttJEElSGB6j7pCGkFh63Kd">
+              <span class="cand-kind" v-text="c.kindLabel" data-page-node-id="TH3YSeVlhQkQsJKqLb98CE"></span>
+              <span class="loc-badge" :class="c.badgeCls" v-text="c.badge" data-page-node-id="MccZFYtWKOLNPViYg2XAwR"></span>
+              <code class="loc-val" :class="expMap[c.value] ? 'exp' : ''" @click="toggleExp(c.value)" v-text="c.value"></code>
+              <button class="mini-btn" @click="copy(c.value)" data-page-node-id="bNhxoGs5v7ZDpfl7QDuQeT">复制</button>
+            </div>
+          </div>
+          <div class="card" data-page-node-id="UBwIgaCGctpX4BkoHXtH9X">
+            <div class="card-title" data-page-node-id="wW4HhJZwL7Pg1D4kYGFqNC">坐标与上下文信息</div>
+            <div class="kv" data-page-node-id="1XXkOjzzJMRagBodk4more"><span class="k" data-page-node-id="j43gELuEjx1UpWMKvCiBPU">拾取坐标</span><span class="v mono" v-text="current.pos" data-page-node-id="6pzeGyquxhsrtQo9oE3Zw6"></span></div>
+            <div class="kv" data-page-node-id="3FzXyMI2sbCcnP0eCgSPCq"><span class="k" data-page-node-id="3cI6eMHAx3lOsvvU9edVB0">页面标题</span><span class="v" v-text="current.title" data-page-node-id="KQmnULDThOe4WF9UWr7tNJ"></span></div>
+            <div class="kv" data-page-node-id="Jx4QGSKCAgMAI4jtAgsKtK"><span class="k" data-page-node-id="b5LlBoAKJ9MNSjyZgOcoJF">页面地址</span><span class="v mono" v-text="current.url" data-page-node-id="spRBoA6V03U7McPo2HFgLX"></span></div>
+            <div class="kv" data-page-node-id="a2p6t20J3EJt6ZtFdXc5Q5"><span class="k" data-page-node-id="53slGReenmpM8qet10m4N8">来源</span><span class="v" v-text="current.src === 'app' ? 'App 应用 (CDP)' : '浏览器拾取'" data-page-node-id="DyQ20O08geZy7wYRh6fUPT"></span></div>
+            <div class="kv" data-page-node-id="9w02jESim0lwU5AfYtsYpW"><span class="k" data-page-node-id="YqNZD50Zlw9YUQFf55Dsgy">拾取时间</span><span class="v mono" v-text="current.timeStr" data-page-node-id="8QuVNFRFvqPX9R30jkfNmW"></span></div>
+          </div>
+        </div>
+
+        <div class="card" data-page-node-id="2JPrJQ89IShq7yVl0BCGDS">
+          <div class="card-head" data-page-node-id="HGDAGyBjbqEtFcnAWqBO2H">
+            <span class="card-title" data-page-node-id="Y3v9I2YXW9WHILJJ3PYT4V">复制与导出 · 输出格式</span>
+            <span class="hs-actions" data-page-node-id="Bo5vj7thVAyFEsuC8KgPVw">
+              <button class="btn btn-ghost btn-sm" @click="exportJson()" data-page-node-id="rADtO34CGNNK2Ky2LG5UUG">导出 JSON</button>
+              <button class="btn btn-primary btn-sm" @click="saveRecord(current)" v-text="current.saved ? '已保存' : '保存到历史'" data-page-node-id="6otNvuOLpHcVxzFcazWLxH"></button>
+            </span>
+          </div>
+          <div class="snip-tabs" data-page-node-id="WUsdzpTq13rrzqi7qCjPxV">
+            <button v-for="t in current.snippetTabs" :key="t.key" class="snip-tab"
+                    :class="current.snipSel===t.key ? 'is-active' : ''"
+                    @click="selSnippet(current, t.key)" v-text="t.label" data-page-node-id="gFRPvSJZFCxHl6fK6JW8Zt"></button>
+          </div>
+          <pre class="snip-code" v-text="current.snipText" data-page-node-id="ErP6M8OdLoGQeqqQDCr2U2"></pre>
+          <button class="btn btn-primary btn-sm" @click="copy(current.snipText)" data-page-node-id="bVKoSFEeAOxFbe8ohBTORj">复制代码片段</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 4. 历史记录 ===== -->
+    <section class="page page-history" v-show="route==='history'" data-page-node-id="sG3cGf6OlAA1fSbIznW5Xn">
+      <div class="hist-grid" data-page-node-id="ug2uhyurZQay0ThANfR8xt">
+        <aside class="hist-side" data-page-node-id="tjB3Z70sdXEckDixDpBpF5">
+          <div class="search-box" data-page-node-id="euSHH8tmOei4IAwtzv4R3N">
+            <i class="layui-icon layui-icon-search" data-page-node-id="abz1T4eDeElRQO8XuhCfmu"></i>
+            <input type="text" v-model="keyword" placeholder="搜索定位符或页面地址" data-page-node-id="f7tADZYLHCFgtrGnVEdvFm">
+          </div>
+          <div class="chip-row" data-page-node-id="k0Ai6s1nvBl9tShP5DcUF9">
+            <button class="chip" :class="activeGroup==='' ? 'is-active' : ''" @click="selGroup('')" data-page-node-id="3xeenhJTWoNlTaj9dfdayD">全部</button>
+            <button class="chip" :class="activeGroup==='__star' ? 'is-active' : ''" @click="selGroup('__star')" data-page-node-id="9mkWh9mXYdvZZkgb8CwFjY">已收藏</button>
+          </div>
+          <div class="card" data-page-node-id="cb0Gq8XlBrPzzwLVuzGeLy">
+            <div class="card-head" data-page-node-id="vscZoDkmGcEYyBrPwp6lAi">
+              <span class="card-title" data-page-node-id="EGfbRR9jh2HDZsUXrobsEK">收藏分组</span>
+              <button class="mini-btn" @click="addGroup()" data-page-node-id="9I0mNUpMyZaG5gJnNAxLZh">新建分组</button>
+            </div>
+            <div class="grp-item" :class="activeGroup==='' ? 'is-active' : ''" @click="selGroup('')" data-page-node-id="FgdOl0PjUIwHyJPRHXN7mJ">
+              <span data-page-node-id="p4u7EPIE4zFDDFPzLLWvbZ">◇ 全部记录</span><span class="grp-count" v-text="historyRaw.length" data-page-node-id="BCXBKiECIgH8d5ZZn3rU6p"></span>
+            </div>
+            <div class="grp-item" v-for="g in groupChips" :key="g.name"
+                 :class="activeGroup===g.name ? 'is-active' : ''" @click="selGroup(g.name)" data-page-node-id="FH6HPUUv1UK2ZhdHmcwAd2">
+              <span v-text="'□ ' + g.name" data-page-node-id="fVcLgA6ANnbSZsIlOyjUDV"></span>
+              <span class="grp-count" v-text="g.count" data-page-node-id="6RpbwDcbc2fTM8KaFwEV8k"></span>
+            </div>
+            <div class="recent-empty" v-if="!historyGroups.length" data-page-node-id="ItOt41vBKDu4rOwjkeVnjg">暂无分组</div>
+          </div>
+          <div class="card hist-list-card" data-page-node-id="ziEwg4Fiaf75qFlDsFwaJl">
+            <div class="card-head" data-page-node-id="bXE8GumOUODkCae6i1mEY2">
+              <span class="card-title" data-page-node-id="I9Cit5P71Tz1g4imd3R1Ik">历史记录</span>
+              <span class="card-sub" v-text="'共 ' + historyRaw.length + ' 条'" data-page-node-id="MiaBXfYqtbJRCuJAdT4W6U"></span>
+            </div>
+            <div class="hist-item" v-for="h in historyFiltered" :key="h.id"
+                 :class="historyDetail && historyDetail.id===h.id ? 'is-active' : ''" @click="openHistory(h.id)" data-page-node-id="lcutefC6HvadItS9BXpU4L">
+              <code class="hi-ident" v-text="h.ident" data-page-node-id="sPDNfDFuLjJhzx5b10CvbF"></code>
+              <span class="hi-sub" v-text="h.text" data-page-node-id="z5sUSs0uDo706uDq54HNX6"></span>
+              <span class="hi-meta" data-page-node-id="WIJM6t4U1EtgFAuwI9CLoA">
+                <span class="hi-time" v-text="h.time" data-page-node-id="XdrplfoDgRcY88OLzD6bpF"></span>
+                <button class="star-btn" :class="h.star ? 'is-on' : ''" @click.stop="starHistory(h)" v-text="h.star ? '★' : '☆'" data-page-node-id="9QP6iBC1iWtGB1kD7AoaPM"></button>
+              </span>
+            </div>
+            <div class="recent-empty" v-if="!historyFiltered.length" data-page-node-id="4fCXD9xgB8DV7ts2zdXOGf">暂无记录</div>
+            <button class="btn btn-ghost btn-sm btn-block" @click="clearHistory()" data-page-node-id="xYxryvqIBGK8kODn6uwzJW">清空历史</button>
+          </div>
+        </aside>
+
+        <div class="hist-main" data-page-node-id="BfokRnUDVylagJEKXiWzTw">
+          <div class="empty-pick" v-if="!historyDetail" data-page-node-id="Gt7sDEyo4Kch56MqYxybww">
+            <div class="empty-icon" data-page-node-id="8IkK0owXdqqqVy7Qj0Cz4V">☰</div>
+            <div class="empty-title" data-page-node-id="nSX4lz7MfQNIHlNKreWKdr">未选中记录</div>
+            <div class="empty-desc" data-page-node-id="Alov0hJs4ggXrYqzFvfAOr">从左侧历史列表选择一条记录查看详情。</div>
+          </div>
+          <template v-else data-page-node-id="IjOxCM0nAv08nzfSZimNBl">
+            <div class="card hist-detail-head" data-page-node-id="beXRon4o38Eop7EsPj1CPd">
+              <span class="loc-hero-tag" v-text="hd.tagDisp" data-page-node-id="sae6W5pcIbTC8EF2mLzS6K"></span>
+              <span class="card-sub" v-text="hd.url" data-page-node-id="WDqYd9aFkxTWzoQAS3aW00"></span>
+              <span class="hs-actions" data-page-node-id="XaERvxSzDNDXylB6VZFfy8">
+                <button class="btn btn-ghost btn-sm" @click="assignGroup({id: historyDetail.id, group: ''})" data-page-node-id="nkzsFVUZaY2Wb32iksJK5O">移动分组</button>
+                <button class="btn btn-danger btn-sm" @click="delHistory(historyDetail.id)" data-page-node-id="F2Hh20mwgbWeMsH3IOBJMH">删除记录</button>
+                <button class="btn btn-primary btn-sm" @click="copy(hd.bestCss || hd.bestXpath)" data-page-node-id="hOoUCTBu913rEiVECnv9Hr">复制定位符</button>
+              </span>
+            </div>
+            <div class="result-row" data-page-node-id="SR9JL3TKY2n3WVx0Y49A4x">
+              <div class="card" data-page-node-id="PlBqGsYFeT6ymMbh4f3bFx">
+                <div class="card-title" data-page-node-id="YJSjthDAsIDivowVBEI4Lz">元素基本信息</div>
+                <div class="kv" data-page-node-id="MqEcIkI0PqkjnknvVglZeV"><span class="k" data-page-node-id="TFX55QiAbpCeqnZt4CPZJZ">标签名</span><span class="v mono" v-text="hd.tag" data-page-node-id="4CY8uWNtgclBD39nVYbroh"></span></div>
+                <div class="kv" data-page-node-id="dmqU0NVTIbEZ3p58ZiBGyz"><span class="k" data-page-node-id="BS8EylynE1DDTdsqqVYTCP">id</span><span class="v mono" v-text="hd.idDisp" data-page-node-id="CiYMlJCjayxXtbxyhvF0ss"></span></div>
+                <div class="kv" data-page-node-id="BEtP5DWOvk2FNXwGL8Tpm2"><span class="k" data-page-node-id="TiIAtyCBmXQkEGv6B5K1TM">name</span><span class="v mono" v-text="hd.nameDisp" data-page-node-id="oD1mkTzbSNN8wah13DUDDm"></span></div>
+                <div class="kv" data-page-node-id="cAYI6vRImWSNs7lmCPx7pl"><span class="k" data-page-node-id="0gyxvpKHmNEI9dteZAkMVo">class</span><span class="v mono" v-text="hd.classDisp" data-page-node-id="2nkJ5XtgpTBnnI6EgJFmko"></span></div>
+                <div class="kv" data-page-node-id="jQ2hEZLikVK3E91eNgiFzG"><span class="k" data-page-node-id="zdHjfkM8EriBYVO07zNrJA">文本内容</span><span class="v" v-text="hd.text" data-page-node-id="B3xqntOBVfgs716jjYmtW3"></span></div>
+                <div class="kv" data-page-node-id="xf278buogn0SNAK3Popxao"><span class="k" data-page-node-id="SqKHWvN2ynUDjnKk3OAgil">尺寸与位置</span><span class="v mono" v-text="hd.size + ' · ' + hd.pos" data-page-node-id="xC5THuzQX2ZbADEH4GYHhs"></span></div>
+              </div>
+              <div class="card" data-page-node-id="oYGSS2qP2O8fCUe7muCTtI">
+                <div class="card-title" data-page-node-id="Gg8CliE5rnI46ODs9xZH38">定位符</div>
+                <div class="loc-row" data-page-node-id="ncAXORRqytrE1tJeEKwLqV">
+                  <span class="loc-kind" data-page-node-id="i7Sy8ArCmzC9EeKWIXUsU6">XPath</span>
+                  <span class="loc-badge" :class="hd.uniqueXpath ? 'is-unique' : ''" v-text="hd.uniqueXpath ? '唯一' : '待校验'" data-page-node-id="CsFY0AWDtSif4GQHDgEMRF"></span>
+                  <code class="loc-val" :class="expMap[hd.bestXpath] ? 'exp' : ''" @click="toggleExp(hd.bestXpath)" v-text="hd.bestXpath"></code>
+                  <button class="mini-btn" @click="copy(hd.bestXpath)" data-page-node-id="R1n62Z9wWcuzEWvRBUQ3Rm">复制</button>
+                </div>
+                <div class="loc-row" data-page-node-id="iIHTYdDkaREnGxqfJnFucE">
+                  <span class="loc-kind" data-page-node-id="M5b9QM9rah7N0rJmNg1bJM">CSS</span>
+                  <span class="loc-badge" :class="hd.uniqueCss ? 'is-unique' : ''" v-text="hd.uniqueCss ? '唯一' : '待校验'" data-page-node-id="NY3PUfM4onwR4GXOSnKACJ"></span>
+                  <code class="loc-val" :class="expMap[hd.bestCss] ? 'exp' : ''" @click="toggleExp(hd.bestCss)" v-text="hd.bestCss"></code>
+                  <button class="mini-btn" @click="copy(hd.bestCss)" data-page-node-id="1CDh6suHDY7iNIpMctmLAG">复制</button>
+                </div>
+                <div class="kv" data-page-node-id="SCC3PZEuiURAHnD7uBU4YJ"><span class="k" data-page-node-id="GNtCA9MDol8WKy2y3pRBDe">拾取地址</span><span class="v mono" v-text="hd.url" data-page-node-id="fUI36TwrHWoGp5zEnbpjVc"></span></div>
+                <div class="kv" data-page-node-id="4zbGJzB2oRB85bXzbtzg6a"><span class="k" data-page-node-id="qT5JseQeMK2ftAAQljVwgL">保存时间</span><span class="v mono" v-text="hd.timeStr" data-page-node-id="6A783JrCEyhXJBe5MiBP5j"></span></div>
+                <button class="btn btn-primary btn-sm" @click="openHistoryResult()" data-page-node-id="lfu5teS9iGA2Hm2DCBaHkb">查看完整结果 →</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 5. App 拾取 ===== -->
+    <section class="page page-app" v-show="route==='app'" data-page-node-id="SXGkTqGGVzjiv6Il7LPBII">
+      <div class="pick-bar" data-page-node-id="yYC8dj3NuNEc4SlKEGsSe4">
+        <span class="pb-chip" :class="appConnected ? 'is-on' : ''" v-text="appConnected ? 'CDP 已连接' : '未连接'"></span>
+        <span class="pb-url">App 应用拾取 · WebView2 / Electron (CDP 远程调试)</span>
+        <button class="btn btn-sm" :class="aMode==='pick' ? 'btn-primary' : 'btn-ghost'"
+                v-if="appConnected && appSelected>=0" @click="toggleAMode()"
+                v-text="aMode==='pick' ? '⌖ 拾取中' : '↔ 浏览中'"></button>
+      </div>
+      <div class="pick-grid" data-page-node-id="doIATN3n8ijr9FTKkDiF88">
+        <div class="app-main" data-page-node-id="yX03HL1YFF2Qh5yqOr5BnN">
+          <div class="card" data-page-node-id="o4Q7766bHSf5j68SvwQOCo">
+            <div class="card-title" data-page-node-id="bMnuy8EoYBkpSaHeGGgzOr">连接配置</div>
+            <div class="url-row" data-page-node-id="TfiXrOyeZ7OC03pOhcG0W4">
+              <div class="url-input" data-page-node-id="zOeyCNn5Sevsv1RFZdV5NC">
+                <span class="port-label" data-page-node-id="R7w3veSYKRKrzgcdNlAVU5">CDP 端口</span>
+                <input type="text" v-model="appPort" placeholder="9222" data-page-node-id="auTAQ1qhiFMnG1GKeWiPLZ">
+              </div>
+              <button class="btn btn-primary" :class="busy ? 'is-busy' : ''" @click="connectApp()" v-text="appConnected ? '重连' : '连接应用'" data-page-node-id="VHMBhnHAR6wF5UYSr3SWqx"></button>
+              <button class="btn btn-ghost" v-if="appConnected" @click="disconnectApp()" data-page-node-id="snTn7zQ05fZcMaBcRA1Y1C">断开</button>
+              <button class="btn btn-ghost" v-if="appConnected" @click="refreshTargets()" data-page-node-id="UkFe6Hyn5Ko6bCRjgRJKNZ">刷新目标</button>
+            </div>
+          </div>
+          <div class="card" data-page-node-id="P2FNhHG4cgfWQUOlh6KCkd">
+            <div class="card-head" data-page-node-id="O0pZvZpErhse7EZjngo3DD">
+              <span class="card-title" data-page-node-id="IBoec7C3fXGZeCvzrtwHWC">应用内目标页面</span>
+              <span class="card-sub" v-text="appTargets.length ? appTargets.length + ' 个目标 · 点击选中后开始拾取' : ''" data-page-node-id="NvvsBPH9Bf82MV9XCwaBFs"></span>
+            </div>
+            <div class="recent-empty" v-if="!appTargets.length" data-page-node-id="stepm3aO3RKycHBkt1zfRq">连接后此处列出应用内的全部页面/窗口</div>
+            <div class="tgt-item" v-for="t in appTargets" :key="t.idx"
+                 :class="appSelected===t.idx ? 'is-active' : ''" @click="selectTarget(t)" data-page-node-id="tAhqS1EdiiASx46FwqHub5">
+              <span class="rec-dot" :class="appSelected===t.idx ? 'is-on' : ''" data-page-node-id="yMswewDbqw2Y1vnGkJr1Ey"></span>
+              <span class="tgt-title" v-text="t.title" data-page-node-id="EMx4ez2XuLtcAWcNoGl7DM"></span>
+              <span class="tgt-url" v-text="t.short" data-page-node-id="6H8wS1XvS1iFIh6okbMscr"></span>
+            </div>
+          </div>
+          <div class="card" data-page-node-id="LZEwwaDPcJ7dqxCnGZKFWj">
+            <div class="card-title" data-page-node-id="ivsdY2heZFzuaK0GVSHAwD">使用说明</div>
+            <div class="guide-step" data-page-node-id="f6GJbgIkN3JnTIGJlTZkjX"><i data-page-node-id="WhbFam6t78gkWSR9a3zq5l">1</i><b data-page-node-id="0Ac67jQVrtnNwFS3MycZPk">WebView2 应用</b>: 启动前设置环境变量 WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = --remote-debugging-port=9222，或在代码中传 additional_browser_arguments。</div>
+            <div class="guide-step" data-page-node-id="nq1H42ZcC3TLCSDEa7o94x"><i data-page-node-id="qN4APzaYAuYDzifpKGF6S6">2</i><b data-page-node-id="yIQPtXJQwuKz33Hm4zC9Xc">Electron 应用</b>: 主进程加入 app.commandLine.appendSwitch('remote-debugging-port', '9222')。</div>
+            <div class="guide-step" data-page-node-id="JYfHvYPJR6tZcO5oZd6JiB"><i data-page-node-id="kBKJ6yflOLPH4SbtGp6CgN">3</i>连接后从目标列表选中页面，点击应用窗口内元素即可拾取，定位符生成逻辑与浏览器拾取完全一致。</div>
+            <div class="guide-tip" data-page-node-id="nmIUYQ096YrLhZ5kindP99">提示: pywebview 自身基于 WebView2，同样可以被本工具接管拾取。</div>
+          </div>
+        </div>
+        <aside class="pick-side" data-page-node-id="SPQk6fHvL5BEYrT9UwXKw9">
+          <div class="card" data-page-node-id="BrHnuWOr1GqC46Fx9kRUkj">
+            <div class="card-head" data-page-node-id="wKUQ4is7kzWokvckmT4QyU">
+              <span class="card-title" data-page-node-id="TcnDOzF46O7Z4CFz8kuPvB">App 元素定位</span>
+              <span class="live-chip is-on" v-if="appSelected>=0"><i class="dot"></i>实时拾取</span>
+            </div>
+            <template v-if="appLatest" data-page-node-id="8nG7ANLxxcndcsyDL8vkvF">
+              <div class="loc-hero" data-page-node-id="NshbsUAIH1l6iD8kE1SNpq">
+                <span class="loc-hero-tag" v-text="appLatest.tagDisp" data-page-node-id="oaFQ5qSOVd1kijYHkMWYOY"></span>
+                <button class="mini-btn" @click="copy(appLatest.tagDisp)" data-page-node-id="E1I5FoZdwFDiDav1uCpSnB">复制</button>
+              </div>
+              <div class="kv" data-page-node-id="YFoG96kvRflpiREdTzDTKE"><span class="k" data-page-node-id="x0wteTUMDjs48H9Ub2xMov">标签名</span><span class="v mono" v-text="appLatest.tag" data-page-node-id="J4k6hyezgpntJOwJAAd0CU"></span></div>
+              <div class="kv" data-page-node-id="VyG6QCkxBEPKVQD1vt09zY"><span class="k" data-page-node-id="sdRy1lbswk9EwFAAGOgvfN">id</span><span class="v mono" v-text="appLatest.idDisp" data-page-node-id="obi3R7khQF4493TG3DjZnK"></span></div>
+              <div class="kv" data-page-node-id="wh5nUYfIvhIDz9O5IYs000"><span class="k" data-page-node-id="XJoFzLJB67PXxKjHReAiqx">class</span><span class="v mono" v-text="appLatest.classDisp" data-page-node-id="6gWARg525WmjymXaLXTha5"></span></div>
+              <div class="kv" data-page-node-id="5jBXuA3ymyKoutQmngYE9A"><span class="k" data-page-node-id="JgjId7LDWNZMqcbAKnpcA7">文本内容</span><span class="v" v-text="appLatest.text" data-page-node-id="cwCIhXmCrermCHlL9ofmeG"></span></div>
+              <div class="loc-row" data-page-node-id="RZEbF9AWNWbrylyGozlajj">
+                <span class="loc-kind" data-page-node-id="vVwDu1p5yWgGHB4ODuhJ1j">XPath</span>
+                <span class="loc-badge" :class="appLatest.uniqueXpath ? 'is-unique' : ''" v-text="appLatest.uniqueXpath ? '唯一' : '待校验'" data-page-node-id="7yH5MOADrYWqKf1APTueBw"></span>
+                <code class="loc-val" :class="expMap[appLatest.bestXpath] ? 'exp' : ''" @click="toggleExp(appLatest.bestXpath)" v-text="appLatest.bestXpath"></code>
+                <button class="mini-btn" @click="copy(appLatest.bestXpath)" data-page-node-id="vK3QuuHwQwuOqQ6FQ2BcF3">复制</button>
+              </div>
+              <div class="loc-row" data-page-node-id="PHkNDREH2FFfsVAq0vAOq2">
+                <span class="loc-kind" data-page-node-id="brOawMclQimM3giLVBDNqD">CSS</span>
+                <span class="loc-badge" :class="appLatest.uniqueCss ? 'is-unique' : ''" v-text="appLatest.uniqueCss ? '唯一' : '待校验'" data-page-node-id="vhHD28zFUdm3YYIcZVAQft"></span>
+                <code class="loc-val" :class="expMap[appLatest.bestCss] ? 'exp' : ''" @click="toggleExp(appLatest.bestCss)" v-text="appLatest.bestCss"></code>
+                <button class="mini-btn" @click="copy(appLatest.bestCss)" data-page-node-id="LCLowafRuNPnSMWRpm2TAC">复制</button>
+              </div>
+              <button class="btn btn-ghost btn-block" @click="openAppResult(appLatest)" data-page-node-id="fImHmglHZRcG9ZVy31H1eM">查看完整定位结果 →</button>
+            </template>
+            <div class="empty-side" v-else data-page-node-id="41DrJcXHOJJSjFzbzyHewA">选中目标页面后开始拾取</div>
+          </div>
+          <div class="card" v-if="appPicks.length" data-page-node-id="QxrMMMLGwpmrDbQW0qw7Ds">
+            <div class="card-head" data-page-node-id="bgGjuUcavg0CrJaqjwKif2">
+              <span class="card-title" data-page-node-id="BCyzQrlhOYGb8s7GxAslhR">拾取流</span>
+              <span class="card-sub" v-text="'共 ' + appPicks.length + ' 条'" data-page-node-id="tnBanCNtMXLuPHuXaLpkPE"></span>
+              <button class="stream-clear" @click="clearPicks('app')" data-page-node-id="tnBanCNtMXLuPHuXaLpkPE2">清空</button>
+            </div>
+            <div class="hist-item" :class="aFocus===p ? 'is-sel' : ''" v-for="(p,i) in appPicks.slice(0,8)" :key="'a'+i" @click="selPick(p, 'app')" data-page-node-id="byKtwytpoyXCzhPBYTL1Xu">
+              <code class="hi-ident" v-text="p.bestCss || p.bestXpath" data-page-node-id="QDBZxpZzye3xkcBR82WUuc"></code>
+              <span class="hi-time" v-text="p.timeStr" data-page-node-id="WGUtYpWY9gKrqGKGvSIGZZ"></span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== 底部状态条 ===== -->
+  <footer class="statusbar" data-page-node-id="1OFMH1W5YbTvXdCILydcsL">
+    <span class="sb-left" data-page-node-id="BbYsIDePq5QsQDFqiZS03P">
+      <i class="dot" :class="bStatus.running || appConnected ? 'is-on' : ''" data-page-node-id="Wkz9oPFGz8G4QDzhfSvqOq"></i>
+      <span v-text="bStatus.running ? '浏览器拾取进行中' : (appConnected ? 'App 拾取进行中' : '等待连接')" data-page-node-id="kAt25m50BmoYMcFzAgvCP2"></span>
+    </span>
+    <span class="sb-right" v-if="latest" data-page-node-id="SHiY7IK4rv2Rm84xLB3Rok">
+      <span v-text="'坐标 x ' + latest.x + ' · y ' + latest.y" data-page-node-id="gmFpMiYC1XPy3jYBUvCrLd"></span>
+      <span v-text="'元素 ' + latest.tagDisp" data-page-node-id="STtmCQOCDrE2VrIVyR80mC"></span>
+      <span v-text="'拾取耗时 ' + pollMs + ' ms'" data-page-node-id="o0KuHlf1rE7l66tYSPRVy0"></span>
+    </span>
+    <span class="sb-right" v-else data-page-node-id="vXEgEcCyAPHxaRDhYwaAzT">
+      <span data-page-node-id="2JFohZzWfpJZPaf8wYKNKd">窗口 1440 x 960</span>
+      <span data-page-node-id="dbSZGhvTboAtKVauia3fsz">拾取模式: 点击拾取</span>
+    </span>
+  </footer>
+</div>
+
+<script src="vendor/petite-vue.iife.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

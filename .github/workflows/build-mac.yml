@@ -1,0 +1,103 @@
+name: Build macOS App
+# 没有 mac 机器时的单独打包路径: PyInstaller 不能交叉编译,
+# 借 GitHub Actions 的 mac runner 产出真正的 .app。
+#
+# 说明: 日常出包不用手动点 —— push 到 main 后由 release.yml 自动打包并发 Release
+# (win + mac 双架构都在 Release assets 里)。本工作流只用于
+# 「只想单独打一个 mac 包、不想发 Release」的场景, 仅手动触发,
+# 避免每次 push main 重复打 mac (mac runner 按 10 倍计费)。
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: '构建架构'
+        required: true
+        default: 'both'
+        type: choice
+        options: [both, arm64, x86_64]
+      dmg:
+        description: '额外产出 dmg'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            arch: arm64
+          - os: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+
+    env:
+      BUILD_REF: main
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: '1'
+
+    steps:
+      # matrix 上下文只能在 step 级 if 里引用 (job 级 if 在 matrix 展开前求值会报错),
+      # 所以「单选架构」的跳过逻辑放在每个 step 的 if 上
+      - name: Checkout main
+        if: ${{ github.event.inputs.arch == 'both' || github.event.inputs.arch == matrix.arch }}
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Python
+        if: ${{ github.event.inputs.arch == 'both' || github.event.inputs.arch == matrix.arch }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Build .app
+        if: ${{ github.event.inputs.arch == 'both' || github.event.inputs.arch == matrix.arch }}
+        run: |
+          chmod +x build_mac.sh
+          if [ "${{ github.event.inputs.dmg }}" != "false" ]; then
+            ./build_mac.sh --dmg
+          else
+            ./build_mac.sh
+          fi
+
+      - name: Smoke test
+        if: ${{ github.event.inputs.arch == 'both' || github.event.inputs.arch == matrix.arch }}
+        run: |
+          NAME="element_picker"
+          EXE="dist/$NAME.app/Contents/MacOS/$NAME"
+          test -x "$EXE" || { echo "[错误] 找不到可执行文件"; exit 1; }
+          N=$(find "dist/$NAME.app/Contents" -path "*.local-browsers/chromium*" -name "Chromium" | wc -l)
+          [ "$N" -ge 1 ] || { echo "[错误] 包内没有内置 Chromium"; exit 1; }
+          "$EXE" &
+          PID=$!
+          sleep 15
+          if kill -0 "$PID" 2>/dev/null; then
+            echo "进程存活 15s -> OK"
+            kill "$PID" || true
+          else
+            echo "[错误] 进程 15s 内退出 (依赖缺失或签名问题)"
+            exit 1
+          fi
+
+      - name: Upload artifacts (zip)
+        if: ${{ github.event.inputs.arch == 'both' || github.event.inputs.arch == matrix.arch }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: element_picker-macos-${{ matrix.arch }}
+          path: dist/element_picker_*_macos_*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload artifacts (dmg)
+        if: ${{ (github.event.inputs.arch == 'both' || github.event.inputs.arch == matrix.arch) && github.event.inputs.dmg != 'false' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: element_picker-macos-${{ matrix.arch }}-dmg
+          path: dist/element_picker_*_macos_*.dmg
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv_mac/
+venv/
+/data/
+# PyInstaller 打包产物
+build/
+build_*/
+dist/
+dist_*/
+*.versiontmp
+
+# 运行时本地数据 (历史记录是用户数据, 不入库)
+data/history.json
+data/export_*.json
+
+# 图标文件必须入库 (CI 预检会检查), 防止通配规则误伤
+!config/icon.ico
+!config/icon.png
+
+# 工具本地文件
+.workbuddy/
+.playwright-cli/
+.idea/
+*.log
+*/csdn_share.md
