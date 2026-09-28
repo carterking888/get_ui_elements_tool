@@ -48,14 +48,27 @@ for pkg in ('playwright', 'selenium', 'webview'):
 # 从 collect_all 结果里剔除 bundle_browsers.py 预置进 venv 的 Chromium
 # ( playwright/driver/package/.local-browsers ), 启动时改用系统 Chrome/Edge
 LITE = os.environ.get('ELEMENT_PICKER_LITE', '') == '1'
+def _is_bundled_browser(entry):
+    dest = entry[1].replace('\\', '/')
+    return '.local-browsers' in dest
 if LITE:
-    def _is_bundled_browser(entry):
-        dest = entry[1].replace('\\', '/')
-        return '.local-browsers' in dest
     n0 = len(datas) + len(binaries)
     datas = [e for e in datas if not _is_bundled_browser(e)]
     binaries = [e for e in binaries if not _is_bundled_browser(e)]  # Chromium 的 dll 会进 binaries
     print('[spec] Lite 模式: 剔除内置 Chromium %d 项 (datas+binaries), 剩 %d 项'
+          % (n0 - len(datas) - len(binaries), len(datas) + len(binaries)))
+elif sys.platform == 'darwin':
+    # macOS 专属坑: PyInstaller 会对收集到的 Mach-O 做 ad-hoc 重签处理,
+    # Chromium 主程序签名结构特殊, 处理直接失败:
+    #   SystemError: Failed to process binary
+    #   '.../.local-browsers/chromium-*/chrome-mac-*/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
+    # → 打包阶段剔除, 构建后由 build_mac.sh 用普通 cp -R 拷进 .app
+    #   ( 纯文件拷贝绕过二进制处理; sys._MEIPASS 指向 Contents/Frameworks,
+    #     与运行时检测路径 / playwright driver 浏览器发现路径完全对齐 )
+    n0 = len(datas) + len(binaries)
+    datas = [e for e in datas if not _is_bundled_browser(e)]
+    binaries = [e for e in binaries if not _is_bundled_browser(e)]
+    print('[spec] macOS: 剔除内置 Chromium %d 项 (PyInstaller 无法处理其签名, 打包后由 build_mac.sh 拷回), 剩 %d 项'
           % (n0 - len(datas) - len(binaries), len(datas) + len(binaries)))
 
 if sys.platform == 'win32':

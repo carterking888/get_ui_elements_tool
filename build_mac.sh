@@ -66,24 +66,23 @@ if [ "$LITE" = "1" ]; then
 elif [ -n "$ELEMENT_PICKER_LITE" ]; then
     unset ELEMENT_PICKER_LITE
 fi
-# Lite: 临时移走 venv 里的 .local-browsers (PyInstaller 的 playwright hook 会自行
-# 收集 driver 包数据, spec 过滤拦不住, 只能从源头断供), 打完用 trap 兜底还原
+# 打包前把 venv 里的 .local-browsers 移出 playwright hook 递归收集范围
+# ( 实测 hook 会收集 driver/package 下的一切, 同目录改名 / spec 过滤都拦不住,
+#   只能移到 venv 根目录断供 )。Lite 不需要浏览器; 完整版打完再拷进 .app。
 LB_RENAMED=""
-if [ "$LITE" = "1" ]; then
-    # 移到 venv 根目录 (playwright hook 会递归收集 driver/package 下的一切, 同目录改名无效)
-    LB="$($VPY -c "import playwright,os;print(os.path.join(os.path.dirname(playwright.__file__),'driver','package','.local-browsers'))")"
-    VENV_ROOT="$($VPY -c "import playwright,os;print(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(playwright.__file__)))))")"
-    if [ -d "$LB" ]; then
-        mv "$LB" "$VENV_ROOT/lite_browsers_holding" && LB_RENAMED="$VENV_ROOT/lite_browsers_holding"
-        echo "    [lite] 已临时移走 venv 内置浏览器"
-    fi
+LB="$($VPY -c "import playwright,os;print(os.path.join(os.path.dirname(playwright.__file__),'driver','package','.local-browsers'))")"
+LB_ORIG="$LB"
+VENV_ROOT="$($VPY -c "import playwright,os;print(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(playwright.__file__)))))")"
+if [ -d "$LB" ]; then
+    mv "$LB" "$VENV_ROOT/lite_browsers_holding" && LB_RENAMED="$VENV_ROOT/lite_browsers_holding"
+    echo "    已临时移走 venv 内置浏览器 ( hook 递归收集范围外 )"
 fi
 restore_lb() {
     if [ -n "$LB_RENAMED" ] && [ -d "$LB_RENAMED" ]; then
-        mv "$LB_RENAMED" "$(dirname "$LB_RENAMED")/Lib/site-packages/playwright/driver/package/.local-browsers" \
-          || mv "$LB_RENAMED" "$(dirname "$LB_RENAMED")/lib/python3.13/site-packages/playwright/driver/package/.local-browsers" \
-          && echo "    [lite] venv 内置浏览器已还原" \
-          || echo "    [warn] 浏览器目录还原失败, 手工从 lite_browsers_holding 移回即可"
+        mkdir -p "$(dirname "$LB_ORIG")"
+        mv "$LB_RENAMED" "$LB_ORIG" \
+          && echo "    venv 内置浏览器已还原" \
+          || echo "    [warn] 浏览器目录还原失败, 手工从 lite_browsers_holding 移回: $LB_ORIG"
     fi
 }
 trap restore_lb EXIT
@@ -91,8 +90,30 @@ trap restore_lb EXIT
 APP="dist/$NAME.app"
 EXE="$APP/Contents/MacOS/$NAME"
 test -x "$EXE" || { echo "[错误] 未生成 $EXE"; exit 1; }
+
+# macOS: Chromium 不让 PyInstaller 收集 —— 其对 Mach-O 的 ad-hoc 重签处理会在
+# "Google Chrome for Testing" 主程序上失败 ( SystemError: Failed to process binary )。
+# 打完包从暂存目录用普通 cp -R 拷进 .app ( 纯文件拷贝绕过二进制处理 );
+# sys._MEIPASS 指向 Contents/Frameworks, 目标路径与运行时检测 /
+# playwright driver 的浏览器发现路径完全对齐。
+if [ "$LITE" != "1" ]; then
+    LB_HOLD="$VENV_ROOT/lite_browsers_holding"
+    LB_DEST="$APP/Contents/Frameworks/playwright/driver/package/.local-browsers"
+    if [ -d "$LB_HOLD" ]; then
+        echo "==> 4.5/6 拷贝内置 Chromium 进 .app ( 绕过 PyInstaller 二进制处理 )"
+        mkdir -p "$(dirname "$LB_DEST")"
+        # cp -R 保留符号链接 ( Chrome Frameworks 里有 Current -> A 软链 )
+        cp -R "$LB_HOLD" "$LB_DEST"
+        echo "    已拷贝: $(du -sh "$LB_DEST" | cut -f1)"
+    else
+        echo "[错误] 没找到浏览器暂存目录 $LB_HOLD, 先确认 bundle_browsers.py 已跑过"; exit 1
+    fi
+fi
+
 # 自检: 完整版浏览器必须进包; Lite 版必须没有浏览器 (防止 dist 残留混入)
-SO_N=$(find "$APP/Contents" -path "*playwright/driver/package/.local-browsers/chromium*" -name "Chromium" | wc -l | tr -d ' ')
+# 注意: playwright 的 mac Chromium 主程序叫 "Google Chrome for Testing",
+# 只按 chromium-* 目录匹配, 不能用 -name "Chromium"
+SO_N=$(find "$APP/Contents" -path "*playwright/driver/package/.local-browsers/chromium-*" -type d | wc -l | tr -d ' ')
 if [ "$LITE" = "1" ]; then
     [ "$SO_N" = "0" ] || { echo "[错误] Lite 版里混入了 Chromium, 请清理 dist 后重打"; exit 1; }
     echo "    Lite 自检: 包内无 Chromium, OK"

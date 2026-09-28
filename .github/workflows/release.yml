@@ -123,8 +123,8 @@ jobs:
             test -f "dist/${NAME}_v${APP_VER}_macos_${{ matrix.arch }}.${ext}" \
               || { echo "[错误] 分发文件缺失: *_macos_${{ matrix.arch }}.${ext}"; exit 1; }
           done
-          # 内置 Chromium 自检
-          N=$(find "dist/$NAME.app/Contents" -path "*.local-browsers/chromium*" -name "Chromium" | wc -l)
+          # 内置 Chromium 自检 ( mac 主程序叫 "Google Chrome for Testing", 按 chromium-* 目录匹配 )
+          N=$(find "dist/$NAME.app/Contents" -path "*playwright/driver/package/.local-browsers/chromium-*" -type d | wc -l)
           [ "$N" -ge 1 ] || { echo "[错误] 包内没有内置 Chromium"; exit 1; }
           # 后台拉起 app, 只看进程能否活过初始化
           "$EXE" & PID=$!
@@ -142,7 +142,7 @@ jobs:
           APP_VER=$(grep -oE 'APP_VERSION *= *"[^"]+"' app.py | head -1 | cut -d'"' -f2)
           test -f "dist/${NAME}_v${APP_VER}_macos_${{ matrix.arch }}_lite.zip" \
             || { echo "[错误] Lite zip 未生成: *_macos_${{ matrix.arch }}_lite.zip"; exit 1; }
-          N=$(find "dist/$NAME.app/Contents" -path "*.local-browsers/chromium*" -name "Chromium" | wc -l)
+          N=$(find "dist/$NAME.app/Contents" -path "*playwright/driver/package/.local-browsers/chromium-*" -type d | wc -l)
           [ "$N" -eq 0 ] || { echo "[错误] Lite 包里混入了 Chromium"; exit 1; }
 
       - name: List dist
