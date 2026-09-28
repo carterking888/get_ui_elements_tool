@@ -113,7 +113,7 @@ jobs:
           chmod +x build_mac.sh
           ./build_mac.sh --dmg
 
-      - name: Smoke test (完整版: 可执行文件存在且进程能活过初始化)
+      - name: Smoke test（完整版：可执行文件存在且进程能活过初始化）
         run: |
           NAME="element_picker"
           APP_VER=$(grep -oE 'APP_VERSION *= *"[^"]+"' app.py | head -1 | cut -d'"' -f2)
@@ -193,7 +193,7 @@ jobs:
       - name: PyInstaller pack + zip (文件名自带版本号)
         run: python build_win.py
 
-      - name: Smoke test (完整版: 产物完整 + 内置 Chromium)
+      - name: Smoke test（完整版：产物完整 + 内置 Chromium）
         shell: bash
         run: |
           APP_VER=$(grep -oE 'APP_VERSION *= *"[^"]+"' app.py | head -1 | cut -d'"' -f2)
