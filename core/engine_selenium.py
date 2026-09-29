@@ -130,13 +130,28 @@ class SeleniumEngine(BaseEngine):
             return self._driver.execute_script("return " + body)
         return self._driver.execute_script(js)
 
+    def _probe_alive(self):
+        """存活探测: 会话还活着报实时 URL ( 跟随新标签页 ), 死了报 closed"""
+        d = self._driver
+        if not d:
+            return True, ""
+        try:
+            self._sync_window()
+            return False, d.current_url or ""
+        except Exception:
+            return True, ""
+
     def drain(self):
         if not self._ready:
             return []
         try:
             self._sync_window()
             self.ensure_picker()
-            return self._driver.execute_script("return " + _DRAIN_JS_RAW) or []
+            # _DRAIN_JS_RAW 是块语句, 直接 "return " + 块 会变成
+            # "return { const p = ...; return p; }" -> JS 语法错误,
+            # 必须用 IIFE 包裹: "return (function() { ... })()"
+            return self._driver.execute_script(
+                "return (function() " + _DRAIN_JS_RAW + ")()") or []
         except Exception:
             return []
 
@@ -190,15 +205,8 @@ class SeleniumEngine(BaseEngine):
             except Exception:
                 pass
 
-    def status(self):
-        """检测浏览器窗口是否已被用户手动关闭"""
-        if self._ready:
-            try:
-                self._sync_window()
-                _ = self._driver.current_window_handle
-            except Exception:
-                self._ready = False
-        return BaseEngine.status(self)
+    # status() 用 BaseEngine.status + _probe_alive 钩子, 不再重写
+    # ( 旧重写末尾调 BaseEngine.status 会再次触发 playwright 专属探测, 把 _ready 打成 False )
 
     def _quit(self):
         try:

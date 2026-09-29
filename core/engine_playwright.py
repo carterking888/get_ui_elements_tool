@@ -170,21 +170,19 @@ class BaseEngine(object):
         except Exception as e:
             return {"count": -1, "error": str(e)[:200]}
 
+    def _probe_alive(self):
+        """存活探测钩子: 返回 (closed, url)。子类实现各自引擎的探测;
+        默认不检测 ( 假定存活 ), url 为空表示不更新。"""
+        return False, ""
+
     def status(self):
-        """检测浏览器窗口是否已被用户手动关闭; url 报告活动标签页实时地址"""
+        """检测浏览器窗口是否已被用户手动关闭; url 报告活动标签页实时地址。
+        注意: 探测必须跑在 executor 线程 ( playwright 对象线程绑定 ),
+        且这里只能用 _probe_alive 钩子 —— 不能引用任何 Playwright 专属
+        属性/方法, 否则 Selenium 等子类每次轮询都会被打成未连接。"""
         if self._ready:
-            def _probe():
-                pg = self._active_page()
-                if pg is None:
-                    return True, ""
-                url = ""
-                try:
-                    url = pg.url or ""
-                except Exception:
-                    pass
-                return False, url
             try:
-                closed, url = self._executor.submit(_probe).result(timeout=5)
+                closed, url = self._executor.submit(self._probe_alive).result(timeout=5)
                 if closed:
                     self._ready = False
                 elif url:
@@ -391,6 +389,17 @@ class PlaywrightEngine(BaseEngine):
             self._page = pages[-1]
             return self._page
         return None
+
+    def _probe_alive(self):
+        pg = self._active_page()
+        if pg is None:
+            return True, ""
+        url = ""
+        try:
+            url = pg.url or ""
+        except Exception:
+            pass
+        return False, url
 
     def _apply_mode(self, mode):
         """当前所有页面立即生效 + init_script 让后续新页面继承"""
